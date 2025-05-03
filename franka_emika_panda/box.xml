@@ -1,0 +1,11 @@
+<mujoco model="cube">
+  <worldbody>
+    <body name="box" pos="0 0 0">
+      <freejoint/>
+      <geom type="box" name="box" size="0.015 0.015 0.015" condim="3"
+       friction="1 1 1" rgba="0 1 0 1" contype="1" conaffinity="1" solref="0.01 1"/>
+    </body>
+  </worldbody>
+</mujoco>
+
+<!-- friction="1 .03 .003" -->
