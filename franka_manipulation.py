@@ -35,7 +35,7 @@ def go_to_target(qtarget, motion_time=4.0, fast=True, griphard=False):
 
     _, n_steps, q_plan, qdot_plan, qddot_plan = \
         ctrller.set_target_ctrl(target=qtarget, T=motion_time)              # compute trajectory
-    
+
     i = 0
     while (i < n_steps) and (sim.t < sim_time):
         qddot_des, task_err = ctrller.pd_ctrl(q_plan[i], qdot_plan[i],qddot_plan[i])  # enfore trajectory  

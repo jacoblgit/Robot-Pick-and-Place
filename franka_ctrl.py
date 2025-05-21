@@ -41,13 +41,24 @@ class Franka_TargetController():
         t_list = np.arange(0.,T+dt,dt)
         n_steps = len(t_list)
 
+        # precompute for efficiency
+        t_list2 = t_list**2
+        t_list3 = t_list**3
+        t_list4 = t_list**4
+        t_list5 = t_list**5
+        qdiff = target - q_start
+
         # equations are for quintic polynomial with 0 start and end velocity and acceleration
-        q      = [(target - q_start) * (10*t_list**3/T**3 - 15*t_list**4/T**4 + 6*t_list**5/T**5)[i] \
-                  + q_start  for i in range(n_steps)]
-        qdot   = [(target - q_start) * (30*t_list**2/T**3 - 60*t_list**3/T**4 + 30*t_list**4/T**5)[i] \
-                            for i in range(n_steps)]
-        qddot  = [(target - q_start) * (60*t_list/T**3 - 180*t_list**2/T**4 + 120*t_list**3/T**5)[i]  \
-                            for i in range(n_steps)] 
+        # numpy broadcasting used for computational efficiency
+        
+        s_values = (10*t_list3/T**3 - 15*t_list4/T**4 + 6*t_list5/T**5)
+        q = s_values[:, np.newaxis] * qdiff + q_start   
+
+        sdot_values = (30*t_list2/T**3 - 60*t_list3/T**4 + 30*t_list4/T**5)
+        qdot = sdot_values[:, np.newaxis] * qdiff
+        
+        sddot_values = (60*t_list/T**3 - 180*t_list2/T**4 + 120*t_list3/T**5)
+        qddot = sddot_values[:, np.newaxis] * qdiff
         
         return t_list, n_steps, q, qdot, qddot
     
