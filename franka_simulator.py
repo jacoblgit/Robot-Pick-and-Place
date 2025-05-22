@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mujoco
 import mujoco.viewer
+import imageio # for video saving
 
 class Franka_Simulator(): 
 
-    def __init__(self, max_step=500, model_xml="franka_emika_panda/scene.xml", render=True,
+    def __init__(self, max_step=500, model_xml="franka_emika_panda/scene.xml", render=True, video=True,
                  init_state=[0.,0.,0.,-1.57,0.,1.57,0.,0.,0.,0.4, 0, 0.315, 0.9238795, 0., 0., 0.3826834]):
         
-
+        self.video = video
         self.model = mujoco.MjModel.from_xml_path(str(model_xml))
         self.data  = mujoco.MjData(self.model)
 
@@ -22,6 +23,7 @@ class Franka_Simulator():
         self.stepcount = 0
         self.max_step = max_step
         self.render_step = 20
+        self.video_step = 80
 
         # Set Initial State
         # print("Initial State: ", init_state)
@@ -34,6 +36,14 @@ class Franka_Simulator():
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
             self.viewer.sync() 
 
+        if self.video:
+            # setup video recording
+            self.video_filename = "franka_simulation.mp4"
+            self.video_fps = 30
+            self.video_frames = []
+            self.mj_renderer = None
+            self.mj_renderer = mujoco.Renderer(self.model, height=1088, width=1504)
+
     def step(self, ctrl=None):
         if ctrl is None: ctrl = np.zeros(self.model.nu)
         
@@ -44,14 +54,35 @@ class Franka_Simulator():
         mujoco.mj_step(self.model, self.data)
         if self.render:
             if self.viewer.is_running():
-                if self.stepcount % self.render_step == 0: self.viewer.sync()
+                if self.stepcount % self.render_step == 0:
+                    self.viewer.sync()
+            if self.video:
+                if self.stepcount % self.video_step == 0:
+                    self.mj_renderer.update_scene(self.data)
+                    pixels = self.mj_renderer.render()
+                    self.video_frames.append(pixels)
+
             else: return
         self.stepcount += 1
         self.t += self.dt
+    
+    def save_video(self):
+        if self.video_filename and self.video_frames:
+            try:
+                print(f"Saving video with {len(self.video_frames)} frames at {self.video_fps} FPS to {self.video_filename}...")
+                imageio.mimsave(self.video_filename, self.video_frames, fps=self.video_fps)
+                print(f"Video saved successfully to {self.video_filename}")
+            except Exception as e:
+                print(f"Error saving video: {e}")
+            self.video_frames = [] # Clear frames after saving
+        elif self.video_filename:
+            print("No frames were captured for the video.")
 
     def close_sim(self):
         if self.render: self.viewer.close()
+        if self.mj_renderer: self.mj_renderer.close() 
         print("Finished Simulation, step count: ", self.stepcount)
+
 
     # sets the robots generalized coords and recomputes FK
     def set_robot_joint_state(self, qpos=None):
