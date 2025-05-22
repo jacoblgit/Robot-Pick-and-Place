@@ -33,23 +33,22 @@ def track_state(statevals, sim, task_err):
     statevals["torques"].append(np.copy(sim.data.ctrl[:8]))
 
 # move robot to qtarget position    
-def go_to_target(qtarget, motion_time=4.0, fast=True, griphard=False):
+def go_to_target(qtarget, motion_time=None, fast=True, griphard=False):
 
     _, n_steps, q_plan, qdot_plan, qddot_plan = \
         ctrller.set_target_ctrl(target=qtarget, T=motion_time)              # compute trajectory
     
     i = 0
     while (i < n_steps) and (sim.t < sim_time):
-        qddot_des, task_err = ctrller.pd_ctrl(q_plan[i], qdot_plan[i],qddot_plan[i])  # enfore trajectory  
+        qddot_des, task_err = ctrller.pd_ctrl(q_plan[i], qdot_plan[i],qddot_plan[i])  # enforce trajectory  
         torques = ctrller.get_ctrl(qddot_des)                               # compute torques  
         if (griphard): torques[7] = -50                                     # grip hard
-        # print(f"torques: {np.round(torques,1)}")
         sim.step(torques)                                      
         i += 1
 
         track_state(state_vals, sim, task_err)                            
         if fast: 
-            if (i % 5 == 0): time.sleep(sim.dt)                                    # factor between real and sim time        
+            if (i % 10 == 0): time.sleep(sim.dt)                            # factor between real and sim time        
         else : time.sleep(sim.dt)
 
 
@@ -61,19 +60,19 @@ robot_q0 = sim.get_robot_joint_state()          # robot position
 # open gripper
 qtarget = sim.get_robot_joint_state()
 qtarget[7] = 0.04                               # open gripper
-go_to_target(qtarget)
+go_to_target(qtarget, motion_time=4.)
 
 # move to box
 Tsd = sim.get_robot_body_state("hand")          
 Tsd[:3, 3] = box_T0[:3, 3]                      # set box position
 Tsd[2, 3] = Tsd[2, 3] + 0.11                    # move up a bit
 qtarget, _ = ctrller.compute_IK(Tsd, sim)
-go_to_target(qtarget, motion_time=10.)
+go_to_target(qtarget)
 
 # close gripper
 qtarget = sim.get_robot_joint_state()
 qtarget[7] = 0                                  # close gripper
-go_to_target(qtarget)
+go_to_target(qtarget, motion_time=4.)
 
 # move up
 Tsd = sim.get_robot_body_state("hand")                  
@@ -87,16 +86,16 @@ Tsd = sim.get_robot_body_state("hand")
 Tsd[2, 3] = Tsd[2, 3] - 0.25                    # move down a bit
 Tsd[1, 3] = Tsd[1, 3] + 0.25                    # move to the left a bit
 qtarget, _ = ctrller.compute_IK(Tsd, sim)
-go_to_target(qtarget, griphard=True, motion_time=10.)
+go_to_target(qtarget, griphard=True)
 
 # release box
 qtarget = sim.get_robot_joint_state()
 qtarget[7] = 0.04   # open gripper
-go_to_target(qtarget)
+go_to_target(qtarget, motion_time=4.)
 
 # return to home position
 qtarget = robot_q0
-go_to_target(qtarget, motion_time=10.)
+go_to_target(qtarget)
 
 # stay at home position
 qtarget = sim.get_robot_joint_state()
