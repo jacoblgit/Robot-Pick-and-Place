@@ -22,22 +22,45 @@ class Franka_TargetController():
         tau     = M @ qddot_des + h                 # formula 8.1 in Lynch
         return tau
     
-    def set_target_ctrl(self, target, T, dt=None):
+    def set_target_ctrl(self, target, T=None, dt=None):
         """ 
         Generates a straight line trajectory in joint space with quintic time scaling. 
         Assumes 0 start and end velocity and acceleration.
         
         target: target generalized joint position
-        T: time to reach target
+        T: time to reach target. if None, compute optimal
         dt: time step for trajectory
         returns: robot state at each step in trajectory
         """
-        if dt is None: dt = self.sim.dt
-
         if len(target) != self.sim.nq_panda: 
             raise ValueError(f"target of length {len(target)}, not expected {self.sim.nq_panda}")
-
+        if type(T) != float and T is not None: 
+            raise ValueError(f"T of type {type(T)}, not expected float")
+        if type(dt) != float and dt is not None: 
+            raise ValueError(f"dt of type {type(dt)}, not expected float")  
+        
+        if dt is None: dt = self.sim.dt
         q_start= self.sim.get_robot_joint_state()
+        qdiff = target - q_start
+        
+        
+        if T is None:
+            # see frankaemika.github.io/docs/control_parameters
+            safety_factor = 0.5 # my own judgment
+            qdotlimit = 2.175 * safety_factor  # rad/s
+            qddotlimit = 7.5  * safety_factor  # rad/s^2
+
+            # compute min time to reach target with quintic time scaling while respecting joint limits
+            T = 0
+
+            maxdiff = np.max(np.abs(qdiff))
+            if maxdiff == 0: maxdiff = 1e-3
+            # max joint velocity is 15*qdiff/(8T), occuring at t=T/2 (qddot=0)
+            T = max(T, (15*maxdiff)/(8*qdotlimit))  
+            # max joint accel is 10*qdiff/(sqrt(3)*T^2), occuring at t=1/6(3-sqrt(3))T (qdddot=0)
+            T = max(T, np.sqrt((10 * maxdiff)/(np.sqrt(3)*qddotlimit)))  
+            print(f"Optimal T: {T:.2f} sec")
+                            
         t_list = np.arange(0.,T+dt,dt)
         n_steps = len(t_list)
 
@@ -46,17 +69,18 @@ class Franka_TargetController():
         t_list3 = t_list**3
         t_list4 = t_list**4
         t_list5 = t_list**5
-        qdiff = target - q_start
 
-        # equations are for quintic polynomial with 0 start and end velocity and acceleration
+        # equations are for straight line through joint space with quintic polynomial time scaling
+        # polynomial coefficients set for 0 start and end velocity/acceleration to reduce vibrations
         # numpy broadcasting used for computational efficiency
-        
+
+        # generalized coords form convex set so every point on line between valid points is valid
         s_values = (10*t_list3/T**3 - 15*t_list4/T**4 + 6*t_list5/T**5)
         q = s_values[:, np.newaxis] * qdiff + q_start   
 
         sdot_values = (30*t_list2/T**3 - 60*t_list3/T**4 + 30*t_list4/T**5)
         qdot = sdot_values[:, np.newaxis] * qdiff
-        
+
         sddot_values = (60*t_list/T**3 - 180*t_list2/T**4 + 120*t_list3/T**5)
         qddot = sddot_values[:, np.newaxis] * qdiff
         

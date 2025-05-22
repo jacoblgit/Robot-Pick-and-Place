@@ -19,7 +19,8 @@ state_vals = {
     "qvelvals": [],     # joint velocities  qvel over time
     "xpos_ee": [],      # end effector      pos (x, y, z) over time
     "xpos_obj": [],     # object pos        (x, y, z) over time
-    "task_err": []      # task error        (q_des - q_actual) over time
+    "task_err": [],     # task error        (q_des - q_actual) over time
+    "torques": []       # joint torques
 }
 
 def track_state(statevals, sim, task_err):
@@ -29,23 +30,26 @@ def track_state(statevals, sim, task_err):
     statevals["xpos_ee"].append(sim.get_robot_body_state("hand")[:3, 3])
     statevals["xpos_obj"].append(sim.get_robot_body_state("box")[:3, 3])
     statevals["task_err"].append(task_err)
+    statevals["torques"].append(np.copy(sim.data.ctrl[:8]))
 
 # move robot to qtarget position    
 def go_to_target(qtarget, motion_time=4.0, fast=True, griphard=False):
 
     _, n_steps, q_plan, qdot_plan, qddot_plan = \
         ctrller.set_target_ctrl(target=qtarget, T=motion_time)              # compute trajectory
-
+    
     i = 0
     while (i < n_steps) and (sim.t < sim_time):
         qddot_des, task_err = ctrller.pd_ctrl(q_plan[i], qdot_plan[i],qddot_plan[i])  # enfore trajectory  
         torques = ctrller.get_ctrl(qddot_des)                               # compute torques  
         if (griphard): torques[7] = -50                                     # grip hard
+        # print(f"torques: {np.round(torques,1)}")
         sim.step(torques)                                      
         i += 1
 
         track_state(state_vals, sim, task_err)                            
-        if fast: time.sleep(sim.dt / 40)                                    # factor between real and sim time        
+        if fast: 
+            if (i % 5 == 0): time.sleep(sim.dt)                                    # factor between real and sim time        
         else : time.sleep(sim.dt)
 
 
@@ -64,7 +68,7 @@ Tsd = sim.get_robot_body_state("hand")
 Tsd[:3, 3] = box_T0[:3, 3]                      # set box position
 Tsd[2, 3] = Tsd[2, 3] + 0.11                    # move up a bit
 qtarget, _ = ctrller.compute_IK(Tsd, sim)
-go_to_target(qtarget, motion_time=10)
+go_to_target(qtarget, motion_time=10.)
 
 # close gripper
 qtarget = sim.get_robot_joint_state()
@@ -83,7 +87,7 @@ Tsd = sim.get_robot_body_state("hand")
 Tsd[2, 3] = Tsd[2, 3] - 0.25                    # move down a bit
 Tsd[1, 3] = Tsd[1, 3] + 0.25                    # move to the left a bit
 qtarget, _ = ctrller.compute_IK(Tsd, sim)
-go_to_target(qtarget, griphard=True, motion_time=10)
+go_to_target(qtarget, griphard=True, motion_time=10.)
 
 # release box
 qtarget = sim.get_robot_joint_state()
@@ -92,11 +96,11 @@ go_to_target(qtarget)
 
 # return to home position
 qtarget = robot_q0
-go_to_target(qtarget, motion_time=10)
+go_to_target(qtarget, motion_time=10.)
 
 # stay at home position
 qtarget = sim.get_robot_joint_state()
-go_to_target(qtarget, motion_time=10)
+go_to_target(qtarget, motion_time=10.)
 
 # end simulations
 sim.close_sim()
@@ -104,7 +108,7 @@ sim.close_sim()
 ######################################################################
 # # Plotting
 # figsize = (6, 6)
-# _, axs = plt.subplots(1, 5, figsize=figsize)
+# _, axs = plt.subplots(1, 6, figsize=figsize)
 # plt.suptitle(f"Panda Pick and Place")
 
 # # Plot joint trajectories
@@ -140,5 +144,13 @@ sim.close_sim()
 # axs[4].set_xlabel('Time (s)')
 # axs[4].legend(['j0', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'gripper'], loc='upper right')
 
+# plot torques on new plot
+# plt.figure()
+# plt.plot(state_vals["timevals"], state_vals["torques"])
+# plt.title('Joint Torques')
+# plt.ylabel('Torque (Nm)')
+# plt.xlabel('Time (s)')
+# plt.legend(['j0', 'j1', 'j2', 'j3', 'j4', 'j5', 'j6', 'gripper'], loc='upper right')
+# plt.tight_layout()
 # plt.show()
 ########################################################################
