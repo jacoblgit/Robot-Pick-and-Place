@@ -48,7 +48,7 @@ def go_to_target(qtarget, motion_time=None, fast=True, griphard=False):
 
         track_state(state_vals, sim, task_err)                            
         if fast: 
-            if (i % 10 == 0): time.sleep(sim.dt)                            # factor between real and sim time        
+            if (i % 20 == 0): time.sleep(sim.dt)                            # factor between real and sim time        
         else : time.sleep(sim.dt)
 
 
@@ -103,6 +103,9 @@ go_to_target(qtarget, motion_time=10.)
 
 # end simulations
 sim.close_sim()
+
+if sim.video:
+    sim.save_video()
 
 ######################################################################
 # # Plotting

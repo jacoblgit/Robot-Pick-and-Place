@@ -22,7 +22,7 @@ class Franka_TargetController():
         tau     = M @ qddot_des + h                 # formula 8.1 in Lynch
         return tau
     
-    def set_target_ctrl(self, target, T=None, dt=None, slow=False):
+    def set_target_ctrl(self, target, T=None, dt=None):
         """ 
         Generates a straight line trajectory in joint space with quintic time scaling. 
         Assumes 0 start and end velocity and acceleration.
@@ -46,7 +46,6 @@ class Franka_TargetController():
         
         if T is None:
             safety_factor = 0.05
-            # if slow: safety_factor = 0.01
 
             # see frankaemika.github.io/docs/control_parameters
             qdotlimit = 2.175 * safety_factor  # rad/s
