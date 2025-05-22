@@ -42,7 +42,7 @@ class Franka_Simulator():
             self.video_fps = 30
             self.video_frames = []
             self.mj_renderer = None
-            self.mj_renderer = mujoco.Renderer(self.model, height=1088, width=1504)
+            self.mj_renderer = mujoco.Renderer(self.model, height=1080, width=1504)
 
     def step(self, ctrl=None):
         if ctrl is None: ctrl = np.zeros(self.model.nu)
